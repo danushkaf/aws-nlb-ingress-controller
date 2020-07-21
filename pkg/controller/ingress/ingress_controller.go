@@ -55,13 +55,13 @@ import (
 )
 
 const (
-	ingressNameLengthLimit                  = 51
-	FinalizerCFNStack                       = "nlb.networking.amazonaws.com/ingress-finalizer"
-	IngressClassAnnotation                  = "kubernetes.io/ingress.class"
-	IngressAnnotationNodeSelector           = "nlb.ingress.kubernetes.io/node-selector"
-	IngressAnnotationNginxReplicas          = "nlb.ingress.kubernetes.io/nginx-replicas"
-	IngressAnnotationNginxImage             = "nlb.ingress.kubernetes.io/nginx-image"
-	IngressAnnotationNginxServicePort       = "nlb.ingress.kubernetes.io/nginx-service-port"
+	ingressNameLengthLimit            = 51
+	FinalizerCFNStack                 = "nlb.networking.amazonaws.com/ingress-finalizer"
+	IngressClassAnnotation            = "kubernetes.io/ingress.class"
+	IngressAnnotationNodeSelector     = "nlb.ingress.kubernetes.io/node-selector"
+	IngressAnnotationNginxReplicas    = "nlb.ingress.kubernetes.io/nginx-replicas"
+	IngressAnnotationNginxImage       = "nlb.ingress.kubernetes.io/nginx-image"
+	IngressAnnotationNginxServicePort = "nlb.ingress.kubernetes.io/nginx-service-port"
 )
 
 var (
@@ -625,8 +625,8 @@ func (r *ReconcileIngress) create(instance *extensionsv1beta1.Ingress) (*extensi
 	}
 
 	cfnTemplate := cfn.BuildNLBTemplateFromIngressRule(&cfn.TemplateConfig{
-		Network:                network,
-		NodePort:               int(svc.Spec.Ports[0].NodePort),
+		Network:  network,
+		NodePort: int(svc.Spec.Ports[0].NodePort),
 	})
 
 	b, err := cfnTemplate.YAML()
@@ -670,8 +670,8 @@ func (r *ReconcileIngress) update(instance *extensionsv1beta1.Ingress, stack *cl
 	}
 
 	cfnTemplate := cfn.BuildNLBTemplateFromIngressRule(&cfn.TemplateConfig{
-		Network:                network,
-		NodePort:               int(svc.Spec.Ports[0].NodePort),
+		Network:  network,
+		NodePort: int(svc.Spec.Ports[0].NodePort),
 	})
 	b, err := cfnTemplate.YAML()
 	if err != nil {

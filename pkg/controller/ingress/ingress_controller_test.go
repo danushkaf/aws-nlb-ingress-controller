@@ -671,7 +671,7 @@ func TestReconcileIngress_Reconcile(t *testing.T) {
 						},
 					},
 				},
-				ec2Svc: &mockEC2{},
+				ec2Svc:          &mockEC2{},
 				austoscalingSvc: &mockAutoscaling{},
 				log:             logging.New(),
 			},
