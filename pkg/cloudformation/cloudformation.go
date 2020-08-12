@@ -1,6 +1,7 @@
 package cloudformation
 
 import (
+	"encoding/json"
 	"fmt"
 
 	cfn "github.com/awslabs/goformation/v4/cloudformation"
@@ -8,6 +9,8 @@ import (
 	"github.com/awslabs/goformation/v4/cloudformation/elasticloadbalancingv2"
 	"github.com/awslabs/goformation/v4/cloudformation/tags"
 	"github.com/danushkaf/aws-nlb-ingress-controller/pkg/network"
+
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 )
 
 //const is constance values for resource naming used to build cf templates
@@ -18,6 +21,7 @@ const (
 	ListnerResourceName              = "Listener"
 	SecurityGroupIngressResourceName = "SecurityGroupIngress"
 	TargetGroupResourceName          = "TargetGroup"
+	OutputKeyIngressRules            = "IngressRules"
 	OutputKeyNLBEndpoint             = "NLBHostName"
 )
 
@@ -95,6 +99,7 @@ func buildAWSEC2SecurityGroupIngresses(securityGroupIds []string, cidr string, n
 //TemplateConfig is the structure of configuration used to provide data to build the cf template
 type TemplateConfig struct {
 	Network  *network.Network
+	Rule     extensionsv1beta1.IngressRule
 	NodePort int
 }
 
@@ -116,8 +121,17 @@ func BuildNLBTemplateFromIngressRule(cfg *TemplateConfig) *cfn.Template {
 	loadBalancer := buildAWSElasticLoadBalancingV2LoadBalancer(cfg.Network.SubnetIDs)
 	template.Resources[LoadBalancerResourceName] = loadBalancer
 
+	rulePaths, err := json.Marshal(cfg.Rule.IngressRuleValue.HTTP.Paths)
+	var rulePathsStr string
+	if err != nil {
+		rulePathsStr = ""
+	} else {
+		rulePathsStr = string(rulePaths)
+	}
+
 	template.Outputs = map[string]interface{}{
-		OutputKeyNLBEndpoint: Output{Value: cfn.GetAtt(LoadBalancerResourceName, "DNSName")},
+		OutputKeyNLBEndpoint:  Output{Value: cfn.GetAtt(LoadBalancerResourceName, "DNSName")},
+		OutputKeyIngressRules: Output{Value: rulePathsStr},
 	}
 
 	return template

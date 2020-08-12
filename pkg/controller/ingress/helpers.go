@@ -1,9 +1,12 @@
 package ingress
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go/service/cloudformation"
+	cfn "github.com/danushkaf/aws-nlb-ingress-controller/pkg/cloudformation"
 	"k8s.io/apimachinery/pkg/labels"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -49,4 +52,21 @@ func getNginxReplicas(ingress *extensionsv1beta1.Ingress) int {
 
 func createReverseProxyResourceName(name string) string {
 	return fmt.Sprintf("%s-reverse-proxy", name)
+}
+
+func shouldUpdate(stack *cloudformation.Stack, instance *extensionsv1beta1.Ingress, r *ReconcileIngress) bool {
+	rulePaths, err := json.Marshal(instance.Spec.Rules[0].HTTP.Paths)
+	var rulePathsStr string
+	if err != nil {
+		rulePathsStr = ""
+	} else {
+		rulePathsStr = string(rulePaths)
+	}
+	if rulePathsStr != cfn.StackOutputMap(stack)[cfn.OutputKeyIngressRules] {
+		r.log.Info("Rules in Outputs are not matching, Should Update")
+		return true
+	} else {
+		r.log.Debug("Rules in Outputs are matching, Should Update not triggered.")
+	}
+	return false
 }

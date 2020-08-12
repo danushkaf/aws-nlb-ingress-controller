@@ -1,6 +1,8 @@
 package cloudformation
 
 import (
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -8,7 +10,36 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	cfn "github.com/awslabs/goformation/v4/cloudformation"
 	"github.com/danushkaf/aws-nlb-ingress-controller/pkg/network"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+func getIngressRulesJsonStr() string {
+	Rules := extensionsv1beta1.IngressRule{
+		IngressRuleValue: extensionsv1beta1.IngressRuleValue{
+			HTTP: &extensionsv1beta1.HTTPIngressRuleValue{
+				Paths: []extensionsv1beta1.HTTPIngressPath{
+					{
+						Path: "/api/v1/foobar",
+						Backend: extensionsv1beta1.IngressBackend{
+							ServiceName: "foobar-service",
+							ServicePort: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+		},
+	}
+	rulePaths, err := json.Marshal(Rules.IngressRuleValue.HTTP.Paths)
+	var rulePathsStr string
+	if err != nil {
+		fmt.Println(err)
+		rulePathsStr = ""
+	} else {
+		rulePathsStr = string(rulePaths)
+	}
+	return rulePathsStr
+}
 
 func TestBuildApiGatewayTemplateFromIngressRule(t *testing.T) {
 	tests := []struct {
@@ -19,6 +50,21 @@ func TestBuildApiGatewayTemplateFromIngressRule(t *testing.T) {
 		{
 			name: "generates template",
 			args: &TemplateConfig{
+				Rule: extensionsv1beta1.IngressRule{
+					IngressRuleValue: extensionsv1beta1.IngressRuleValue{
+						HTTP: &extensionsv1beta1.HTTPIngressRuleValue{
+							Paths: []extensionsv1beta1.HTTPIngressPath{
+								{
+									Path: "/api/v1/foobar",
+									Backend: extensionsv1beta1.IngressBackend{
+										ServiceName: "foobar-service",
+										ServicePort: intstr.FromInt(8080),
+									},
+								},
+							},
+						},
+					},
+				},
 				Network: &network.Network{
 					Vpc: &ec2.Vpc{
 						VpcId:     aws.String("foo"),
@@ -38,7 +84,9 @@ func TestBuildApiGatewayTemplateFromIngressRule(t *testing.T) {
 					"LoadBalancer":          buildAWSElasticLoadBalancingV2LoadBalancer([]string{"sn-foo"}),
 				},
 				Outputs: map[string]interface{}{
-					"NLBHostName": Output{Value: cfn.GetAtt("LoadBalancer", "DNSName")}},
+					"NLBHostName":  Output{Value: cfn.GetAtt("LoadBalancer", "DNSName")},
+					"IngressRules": Output{Value: getIngressRulesJsonStr()},
+				},
 			},
 		},
 	}

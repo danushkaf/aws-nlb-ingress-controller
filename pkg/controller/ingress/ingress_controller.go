@@ -18,7 +18,6 @@ package ingress
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -285,7 +284,7 @@ func (r *ReconcileIngress) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{RequeueAfter: 20 * time.Second}, r.Update(context.TODO(), instance)
 	}
 
-	if cfn.IsComplete(*stack.StackStatus) {
+	if cfn.IsComplete(*stack.StackStatus) && shouldUpdate(stack, instance, r) {
 		r.log.Info("updating nlb cloudformation stack", zap.String("stackName", instance.ObjectMeta.Name))
 		if err := r.update(instance, stack); err != nil {
 			return reconcile.Result{}, err
@@ -575,26 +574,12 @@ func (r *ReconcileIngress) updateReverseProxy(instance *extensionsv1beta1.Ingres
 		runtimeObject := object.(runtime.Object)
 
 		// Fix update issue on reverse proxy. Deleting current resource. Need to find reason for this
-		configMap := &corev1.ConfigMap{}
-		deployment := &appsv1.Deployment{}
-		if reflect.TypeOf(object) == reflect.TypeOf(configMap) || reflect.TypeOf(object) == reflect.TypeOf(deployment) {
-			r.log.Info("deleting reverse proxy resource config map", zap.String("gvk", runtimeObject.GetObjectKind().GroupVersionKind().String()), zap.String("name", object.GetName()))
-			r.Delete(context.TODO(), runtimeObject)
-			time.Sleep(2000 * time.Millisecond)
-		}
-
-		err := r.Get(context.TODO(), k8stypes.NamespacedName{Name: object.GetName(), Namespace: object.GetNamespace()}, runtimeObject)
-		switch errors.IsNotFound(err) {
-		case true:
-			r.log.Info("creating reverse proxy resource", zap.String("gvk", runtimeObject.GetObjectKind().GroupVersionKind().String()), zap.String("name", object.GetName()))
-			if err := r.Create(context.TODO(), runtimeObject); err != nil {
-				return nil, err
-			}
-		case false:
-			r.log.Info("reverse proxy resource already exists, updating", zap.String("gvk", runtimeObject.GetObjectKind().GroupVersionKind().String()), zap.String("name", object.GetName()))
-			if err := r.Update(context.TODO(), runtimeObject); err != nil {
-				return nil, err
-			}
+		r.log.Info("deleting reverse proxy resource", zap.String("gvk", runtimeObject.GetObjectKind().GroupVersionKind().String()), zap.String("name", object.GetName()))
+		r.Delete(context.TODO(), runtimeObject)
+		time.Sleep(2000 * time.Millisecond)
+		r.log.Info("creating reverse proxy resource", zap.String("gvk", runtimeObject.GetObjectKind().GroupVersionKind().String()), zap.String("name", object.GetName()))
+		if err := r.Create(context.TODO(), runtimeObject); err != nil {
+			return nil, err
 		}
 	}
 
@@ -626,6 +611,7 @@ func (r *ReconcileIngress) create(instance *extensionsv1beta1.Ingress) (*extensi
 
 	cfnTemplate := cfn.BuildNLBTemplateFromIngressRule(&cfn.TemplateConfig{
 		Network:  network,
+		Rule:     instance.Spec.Rules[0],
 		NodePort: int(svc.Spec.Ports[0].NodePort),
 	})
 
@@ -671,6 +657,7 @@ func (r *ReconcileIngress) update(instance *extensionsv1beta1.Ingress, stack *cl
 
 	cfnTemplate := cfn.BuildNLBTemplateFromIngressRule(&cfn.TemplateConfig{
 		Network:  network,
+		Rule:     instance.Spec.Rules[0],
 		NodePort: int(svc.Spec.Ports[0].NodePort),
 	})
 	b, err := cfnTemplate.YAML()
